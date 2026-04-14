@@ -195,4 +195,93 @@ class ANITrainer:
             ax.legend()
             
         return total_loss
+class AtomicNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(384, 128),
+            nn.CELU(),
+            nn.Dropout,
+            nn.Linear(128, 50)
+        )
+        self.layers2 = nn.Sequential(
+            nn.Linear(50, 20),
+            nn.ReLU(),
+            nn.Dropout,
+            nn.Linear(20, 1)
+        )
+    
+    def forward(self, x):
+        x = self.layers(x)
+        return self.layers2(x)
+
+net_H = AtomicNet()
+net_C = AtomicNet()
+net_N = AtomicNet()
+net_O = AtomicNet()
+
+# ANI model requires a network for each atom type
+# use torch.ANIModel() to compile atomic networks
+ani_net = torchani.ANIModel([net_H, net_C, net_N, net_O])
+model = nn.Sequential(
+    aev_computer,
+    ani_net
+).to(device)
+
+# Trainin Loop
+train_losses = []
+test_losses = []
+epoch_list = []
+
+epochs = 100 
+model.train()
+
+print("Starting Training...\n")
+
+for epoch in range(epochs):
+    model.train()
+    running_train_loss = 0
+    
+    for batch_X, batch_y in train_loader:
+        optimizer.zero_grad()
+        outputs = model(batch_X)
+        loss = criterion(outputs, batch_y)
+        loss.backward()
+        optimizer.step()
+        running_train_loss += loss.item()
+    
+    avg_train_loss = running_train_loss / len(train_loader)
+    train_losses.append(avg_train_loss)
+    epoch_list.append(epoch + 1)
+
+    if (epoch + 1) % 10 == 0:
+        model.eval() 
+        running_test_loss = 0
         
+        with torch.no_grad():
+            test_outputs = model(X_test_t)
+            test_loss = criterion(test_outputs, y_test_t)
+            running_test_loss = test_loss.item()
+            
+        test_losses.append(running_test_loss)
+        
+        print(f"Epoch [{epoch+1}/{epochs}]")
+        print(f" -> Train Loss (MSE): {avg_train_loss:.6f}")
+        print(f" -> Test Loss (MSE):  {running_test_loss:.6f}")
+        print("-" * 30)
+
+
+plt.figure(figsize=(10, 6))
+plt.plot(epoch_list, train_losses, label='Training Loss', color='blue', lw=2)
+
+test_epochs = [i for i in epoch_list if i % 10 == 0]
+plt.plot(test_epochs, test_losses, label='Test Loss', color='red', marker='o', linestyle='--')
+
+plt.title('Model Training Progress (SoC Prediction)', fontsize=14)
+plt.xlabel('Epochs', fontsize=12)
+plt.ylabel('Loss (Mean Squared Error)', fontsize=12)
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+        
+# In Progress
